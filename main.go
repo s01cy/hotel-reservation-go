@@ -1,15 +1,41 @@
 package main
 
-import "github.com/gofiber/fiber/v2"
+import (
+	"context"
+	"flag"
+	"github.com/gofiber/fiber/v2"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"hotel-reservation/api"
+	"hotel-reservation/db"
+	"log"
+)
 
-func main() {
-	app := fiber.New()
-	app.Get("/foo", handleFoo)
-	app.Listen(":5000")
+const dburi = "mongodb://localhost:27017"
+const dbname = "hotel-reservation"
+const userColl = "users"
+
+var config = fiber.Config{
+	ErrorHandler: func(c *fiber.Ctx, err error) error {
+		return c.JSON(map[string]string{"error": err.Error()})
+	},
 }
 
-func handleFoo(c *fiber.Ctx) error {
-	return c.JSON(map[string]string{
-		"message": "Hello, World!",
-	})
+func main() {
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(dburi))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userHandler := api.NewUserHandler(db.NewMongoUserStore(client))
+
+	listenAddr := flag.String("listen-addr", ":5000", "server listen address")
+	flag.Parse()
+
+	app := fiber.New(config)
+	apiv1 := app.Group("/api/v1")
+
+	apiv1.Get("/user", userHandler.HandleGetUsers)
+	apiv1.Get("/user/:id", userHandler.HandleGetUser)
+	app.Listen(*listenAddr)
 }
