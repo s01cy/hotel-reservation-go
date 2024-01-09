@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -10,7 +11,13 @@ import (
 
 const userColl = "users"
 
+type Dropper interface {
+	Drop(ctx context.Context) error
+}
+
 type UserStore interface {
+	Dropper
+
 	GetUserByID(ctx context.Context, id string) (*types.User, error)
 	GetUsers(ctx context.Context) ([]*types.User, error)
 	InsertUser(ctx context.Context, user *types.User) (*types.User, error)
@@ -23,10 +30,15 @@ type MongoUserStore struct {
 	coll   *mongo.Collection
 }
 
-func NewMongoUserStore(c *mongo.Client) *MongoUserStore {
+func (s *MongoUserStore) Drop(ctx context.Context) error {
+	fmt.Println("--- dropping user collection ---")
+	return s.coll.Drop(ctx)
+}
+
+func NewMongoUserStore(c *mongo.Client, dbname string) *MongoUserStore {
 	return &MongoUserStore{
 		client: c,
-		coll:   c.Database(DBNAME).Collection(userColl),
+		coll:   c.Database(dbname).Collection(userColl),
 	}
 }
 
